@@ -648,7 +648,8 @@ function authThen(fn) {
 // 1. Supabase Edge Function 배포 필요
 // 2. CORS 설정 완료 후 활성화
 // 3. 테스트: 브라우저 콘솔에서 오류 메시지 확인
-const RESEND_API_KEY = 're_AJsGmpvY_LopVUCx6X9TyVBhBRMjPxkqU';
+// ⚠️ API Key는 환경변수에서 로드 필요 (보안상 하드코딩 금지)
+const RESEND_API_KEY = '';
 
 async function sendReservationEmail(emails, info) {
   // 현재 비활성화 - Edge Function 배포 대기 중
