@@ -113,6 +113,7 @@ body { font-family:'Pretendard','Noto Sans KR',sans-serif; background:var(--bg);
 .ov-card.selected { border-color:var(--text); box-shadow:0 0 0 2px var(--text); }
 .ov-room-name { font-size:13px; font-weight:600; margin-bottom:3px; }
 .ov-capacity { font-size:10px; color:var(--text-dim); margin-bottom:10px; }
+.ov-features { font-size:10px; color:#2ab87a; font-weight:600; margin-bottom:8px; line-height:1.4; }
 .ov-avail { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; }
 .ov-avail-label { font-size:10px; color:var(--text-dim); }
 .ov-mini-bar { display:flex; gap:2px; margin-top:10px; flex-wrap:wrap; }
@@ -684,11 +685,11 @@ async function sendReservationEmail(emails, info) {
 
 // ── 기본 회의실 / 부서 ────────────────────────
 const DEFAULT_ROOMS = [
-  {name:'회의실1',  cap:6,  color:'#e8522a', light:'#fdf0ec', textColor:'#b03018'},
-  {name:'회의실2',  cap:6,  color:'#2a7ae8', light:'#ecf2fd', textColor:'#1a58b0'},
-  {name:'회의실3',  cap:6,  color:'#2ab87a', light:'#ecfaf3', textColor:'#1a885a'},
-  {name:'회의실4',  cap:6,  color:'#c7832a', light:'#fdf5ec', textColor:'#8f5a18'},
-  {name:'대회의실', cap:12, color:'#7a2ae8', light:'#f3ecfd', textColor:'#5a18b0'},
+  {name:'회의실1',  cap:6,  color:'#e8522a', light:'#fdf0ec', textColor:'#b03018', features:['모니터 연결 가능', '화이트보드']},
+  {name:'회의실2',  cap:6,  color:'#2a7ae8', light:'#ecf2fd', textColor:'#1a58b0', features:['모니터 연결 가능', '화이트보드']},
+  {name:'회의실3',  cap:6,  color:'#2ab87a', light:'#ecfaf3', textColor:'#1a885a', features:['모니터 연결 가능', '화이트보드']},
+  {name:'회의실4',  cap:6,  color:'#c7832a', light:'#fdf5ec', textColor:'#8f5a18', features:['모니터 연결 가능', '화이트보드']},
+  {name:'대회의실', cap:12, color:'#7a2ae8', light:'#f3ecfd', textColor:'#5a18b0', features:['모니터 연결 가능', '화이트보드']},
 ];
 const DEFAULT_DEPTS = ['투자본부','경영지원본부','투자1부','투자2부','투자3부','투자업무부','자금부','회계부','리스크관리부','인사총무부','기타'];
 
@@ -876,8 +877,10 @@ function renderOverview(){
   ROOMS.forEach((r,i)=>{
     const free=all.filter(s=>!getResAt(i,ds,s)).length;
     const bar=all.slice(0,24).map(s=>`<div class="ov-slot" style="background:${getResAt(i,ds,s)?r.color:'#e0dcd6'}"></div>`).join('');
+    const featureStr = r.features && r.features.length > 0 ? r.features.join(', ') : '';
     html+=`<div class="ov-card${roomFilter===i?' selected':''}" onclick="setRoomFilter(${i})" style="border-top:3px solid ${r.color}">
       <div class="ov-room-name">${r.name}</div><div class="ov-capacity">${r.cap}인 · 09–18h</div>
+      ${featureStr ? `<div class="ov-features">${featureStr}</div>` : ''}
       <div class="ov-avail" style="color:${r.color}">${free}</div><div class="ov-avail-label">슬롯 가능</div>
       <div class="ov-mini-bar">${bar}</div>
     </div>`;
@@ -889,7 +892,10 @@ function renderGrid(){
   const ds=toDateStr(selDate), slots=getSlots(9,18);
   const rooms=roomFilter==='all'?ROOMS.map((_,i)=>i):[roomFilter];
   let thead=`<thead><tr><th class="time-col">TIME</th>`;
-  rooms.forEach(ri=>{thead+=`<th><div class="th-room"><div class="th-pip" style="background:${ROOMS[ri].color}"></div>${ROOMS[ri].name}<span style="color:var(--text-dim);font-size:10px;margin-left:3px;">(${ROOMS[ri].cap}인)</span></div></th>`;});
+  rooms.forEach(ri=>{
+    const featureStr = ROOMS[ri].features && ROOMS[ri].features.length > 0 ? `<div style="font-size:9px;color:var(--text-dim);margin-top:4px;">${ROOMS[ri].features.join(', ')}</div>` : '';
+    thead+=`<th><div class="th-room"><div class="th-pip" style="background:${ROOMS[ri].color}"></div><div>${ROOMS[ri].name}<span style="color:var(--text-dim);font-size:10px;margin-left:3px;">(${ROOMS[ri].cap}인)</span>${featureStr}</div></div></th>`;
+  });
   thead+=`</tr></thead>`;
   let tbody=`<tbody>`;
   slots.forEach(slot=>{
@@ -962,11 +968,24 @@ function switchPage(p){
 function renderAdmin(){ renderRoomEditor(); renderDeptEditor(); }
 
 function renderRoomEditor(){
+  const allFeatures = ['모니터 연결 가능', '화이트보드'];
   let html='';
   ROOMS.forEach((r,i)=>{
+    const featureChecks = allFeatures.map(f =>
+      `<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:3px 0;">
+        <input type="checkbox" class="room-feature-${i}" value="${f}" ${r.features && r.features.includes(f) ? 'checked' : ''}>
+        ${f}
+      </label>`
+    ).join('');
     html+=`<div class="room-editor-card" id="rcard-${i}">
       <input type="color" class="room-color-preview" value="${r.color}" id="rcolor-${i}" onchange="updateRoomPreview(${i})">
-      <input type="text" value="${r.name}" id="rname-${i}" placeholder="회의실 이름">
+      <div style="flex:1">
+        <input type="text" value="${r.name}" id="rname-${i}" placeholder="회의실 이름" style="display:block;width:100%;margin-bottom:6px;">
+        <div style="font-size:10px;color:var(--text-mid);margin-bottom:4px;">특징:</div>
+        <div style="padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);font-size:11px;">
+          ${featureChecks}
+        </div>
+      </div>
       <div class="room-cap-wrap">
         <input type="number" value="${r.cap}" id="rcap-${i}" min="1" max="100" style="width:70px">
         <span class="room-cap-label">인</span>
@@ -980,7 +999,7 @@ function renderRoomEditor(){
 
 function updateRoomPreview(i){ document.getElementById(`rpip-${i}`).style.background=document.getElementById(`rcolor-${i}`).value; }
 
-function addRoomEditor(){ ROOMS.push({name:'새 회의실',cap:6,color:'#888888',light:'rgba(136,136,136,0.08)',textColor:'#555555'}); renderRoomEditor(); }
+function addRoomEditor(){ ROOMS.push({name:'새 회의실',cap:6,color:'#888888',light:'rgba(136,136,136,0.08)',textColor:'#555555',features:[]}); renderRoomEditor(); }
 
 function deleteRoomEditor(i){
   if(ROOMS.length<=1){toast('회의실은 최소 1개 이상 필요합니다','⚠️');return;}
@@ -990,12 +1009,18 @@ function deleteRoomEditor(i){
 
 async function saveRooms(){
   const newRooms=[];
+  const allFeatures=['모니터 연결 가능','화이트보드'];
   document.querySelectorAll('[id^="rcard-"]').forEach((_,i)=>{
     const name=document.getElementById(`rname-${i}`).value.trim();
     const cap=parseInt(document.getElementById(`rcap-${i}`).value)||4;
     const color=document.getElementById(`rcolor-${i}`).value;
     const {light,textColor}=makeRoomColors(color);
-    if(name) newRooms.push({name,cap,color,light,textColor});
+    const selectedFeatures=[];
+    allFeatures.forEach(feature=>{
+      const checkbox=document.querySelector(`.room-feature-${i}[value="${feature}"]`);
+      if(checkbox&&checkbox.checked){selectedFeatures.push(feature);}
+    });
+    if(name) newRooms.push({name,cap,color,light,textColor,features:selectedFeatures});
   });
   if(!newRooms.length){toast('회의실 이름을 입력해주세요','⚠️');return;}
   ROOMS=newRooms;
