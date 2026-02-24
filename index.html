@@ -646,38 +646,8 @@ function authThen(fn) {
 const RESEND_API_KEY = 're_AJsGmpvY_LopVUCx6X9TyVBhBRMjPxkqU';
 
 async function sendReservationEmail(emails, info) {
-  if (!Array.isArray(emails)) emails = [emails];
-  emails = emails.filter(e => e && e.includes('@'));
-  if (!emails.length) return;
-
-  try {
-    console.log('📧 이메일 발송 시도:', emails);
-
-    // Supabase Edge Function 호출
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-reservation-email`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ emails, info })
-    });
-
-    console.log('📧 응답 상태:', res.status, res.statusText);
-    const resData = await res.json();
-    console.log('📧 응답 데이터:', resData);
-
-    if (!res.ok) {
-      console.warn('❌ 이메일 발송 실패:', resData);
-      toast(`⚠️ 이메일 발송 실패: ${resData.error || '알 수 없는 오류'}`, '❌');
-    } else {
-      console.log(`✅ ${emails.length}명에게 이메일 발송 완료:`, resData);
-      toast(`✅ ${emails.length}명에게 예약 확인 메일 발송됨`, '📧');
-    }
-  } catch(e) {
-    console.error('❌ 이메일 발송 오류:', e);
-    toast(`⚠️ 이메일 발송 오류: ${e.message}`, '❌');
-  }
+  // Edge Function 배포 대기 중 - 일단 비활성화
+  return;
 }
 
 // ── 기본 회의실 / 부서 ────────────────────────
