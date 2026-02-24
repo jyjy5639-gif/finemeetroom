@@ -610,6 +610,7 @@ CREATE POLICY "allow_all" ON reservations FOR ALL USING (true) WITH CHECK (true)
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeDetailModal()">닫기</button>
+      <button class="btn-ghost" id="btnEditRes" onclick="openEditModal(detailResId)" style="color:#2a7ae8;border-color:#2a7ae8">예약 수정</button>
       <button class="btn-cancel-confirm" id="btnCancelRes" onclick="cancelFromDetail()">예약 취소</button>
     </div>
   </div>
@@ -799,6 +800,7 @@ let selDate = new Date(); selDate.setHours(0,0,0,0);
 let calView = new Date(selDate);
 let roomFilter = 'all', listFilter = 'all', page = 'grid';
 let prefillRoom = null, prefillStart = null;
+let isEditMode = false, editingResId = null;
 
 const pad = n => String(n).padStart(2,'0');
 const toDateStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -1086,6 +1088,33 @@ function setListFilter(v){listFilter=v;renderList();}
 function pickDate(y,m,d){selDate=new Date(y,m,d);render();}
 function calMove(dir){calView.setMonth(calView.getMonth()+dir);renderMiniCal();}
 
+async function openEditModal(id) {
+  if (!id) return;
+  const res = reservations.find(r => r.id === id);
+  if (!res) return;
+
+  isEditMode = true;
+  editingResId = id;
+
+  // Pre-fill the booking modal with existing reservation data
+  document.getElementById('fRoom').value = res.room_idx;
+  document.getElementById('fDate').value = res.date;
+  document.getElementById('fDept').value = res.dept;
+  document.getElementById('fName').value = res.name;
+  document.getElementById('fPurpose').value = res.purpose;
+
+  // Update modal title and button text
+  document.querySelector('.modal-title').textContent = '예약 수정';
+  document.getElementById('btnConfirm').textContent = '수정 확정';
+
+  // Trigger slot rebuilding
+  onFormChange();
+
+  // Open booking modal and close detail modal
+  closeDetailModal();
+  document.getElementById('overlay').classList.add('open');
+}
+
 let detailResId=null;
 function openDetailModal(id){
   const res=reservations.find(r=>r.id===id); if(!res)return;
@@ -1122,6 +1151,13 @@ function openModalWith(ri,slot){prefillRoom=ri;prefillStart=slot;setupModal();do
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 
 function setupModal(){
+  // Reset edit mode when opening fresh booking form
+  isEditMode = false;
+  editingResId = null;
+
+  document.querySelector('.modal-title').textContent = '회의실 예약';
+  document.getElementById('btnConfirm').textContent = '예약 확정';
+
   document.getElementById('fDate').value=toDateStr(selDate);
   document.getElementById('fRoom').value=prefillRoom!=null?String(prefillRoom):(roomFilter!=='all'?String(roomFilter):'');
   document.getElementById('fDept').value='';
@@ -1163,7 +1199,8 @@ function buildEndSlots(){
   for(let add=30;add<=480;add+=30){
     const em=sm+add; if(em>18*60)break;
     const et=fromMin(em);
-    if(!isNaN(ri)&&date&&hasConflict(ri,date,start,et))break;
+    // Skip conflict check if editing existing reservation
+    if(!isEditMode&&!isNaN(ri)&&date&&hasConflict(ri,date,start,et))break;
     opts.push(et);
   }
   document.getElementById('fEnd').innerHTML=opts.map(s=>`<option value="${s}">${s}</option>`).join('');
@@ -1178,7 +1215,8 @@ function checkConflict(){
   const date=document.getElementById('fDate').value;
   const start=document.getElementById('fStart').value;
   const end=document.getElementById('fEnd').value;
-  const conflict=!isNaN(ri)&&date&&start&&end&&hasConflict(ri,date,start,end);
+  // Don't show conflict warning if editing (user can keep same time)
+  const conflict=isEditMode?false:(!isNaN(ri)&&date&&start&&end&&hasConflict(ri,date,start,end));
   document.getElementById('conflictWarn').classList.toggle('show',conflict);
   document.getElementById('btnConfirm').disabled=conflict;
   updatePill();
@@ -1200,35 +1238,56 @@ async function submitForm(){
   const name=document.getElementById('fName').value.trim();
   const purpose=document.getElementById('fPurpose').value.trim();
 
-  // 이메일 여러 개 수집
+  // 이메일 여러 개 수집 (UPDATE 중에는 스킵됨)
   const emailInputs = document.querySelectorAll('.email-input');
   const emails = Array.from(emailInputs).map(input => input.value.trim()).filter(e => e.includes('@'));
 
   if(isNaN(ri)||!date||!start||!end||!dept||!name||!purpose){toast('모든 항목을 입력해주세요','⚠️');return;}
 
   document.getElementById('btnConfirm').disabled=true;
-  document.getElementById('btnConfirm').textContent='저장 중...';
+  const originalText = document.getElementById('btnConfirm').textContent;
+  document.getElementById('btnConfirm').textContent = isEditMode ? '수정 중...' : '저장 중...';
   setSyncState('loading');
 
   try {
-    await sbFetch('reservations',{
-      method:'POST', prefer:'return=minimal',
-      body:JSON.stringify({room_idx:ri,date,start_time:start,end_time:end,dept,name,purpose})
-    });
+    const payload = {room_idx:ri,date,start_time:start,end_time:end,dept,name,purpose};
+
+    if(isEditMode) {
+      // UPDATE existing reservation
+      await sbFetch(`reservations?id=eq.${editingResId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+      toast(`예약이 수정되었습니다!`, '✏️');
+    } else {
+      // CREATE new reservation
+      await sbFetch('reservations', {
+        method: 'POST',
+        prefer: 'return=minimal',
+        body: JSON.stringify(payload)
+      });
+      toast(`${ROOMS[ri].name} ${start}~${end} 예약 완료!`, '✅');
+
+      // 이메일 알림 (백그라운드) - 새 예약만 발송
+      if(emails.length>0){
+        sendReservationEmail(emails,{room:ROOMS[ri].name,date,start,end,dept,name,purpose});
+      }
+    }
+
     closeModal();
     const [y,mo,d]=date.split('-').map(Number);
     selDate=new Date(y,mo-1,d);
-    toast(`${ROOMS[ri].name} ${start}~${end} 예약 완료!`,'✅');
-    // 이메일 알림 (백그라운드)
-    if(emails.length>0){
-      sendReservationEmail(emails,{room:ROOMS[ri].name,date,start,end,dept,name,purpose});
-    }
     await loadData();
+
+    // Reset edit mode
+    isEditMode = false;
+    editingResId = null;
   } catch(e){
-    setSyncState('error'); toast('예약 실패: '+e.message,'❌');
+    setSyncState('error');
+    toast(`${isEditMode ? '수정' : '예약'} 실패: ${e.message}`, '❌');
     document.getElementById('btnConfirm').disabled=false;
   }
-  document.getElementById('btnConfirm').textContent='예약 확정';
+  document.getElementById('btnConfirm').textContent = originalText;
 }
 
 function toast(msg,icon='✅'){
