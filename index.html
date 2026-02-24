@@ -642,12 +642,44 @@ function authThen(fn) {
   else { toast('암호가 올바르지 않습니다', '🔒'); }
 }
 
-// ── 이메일 알림 (Resend) ───────────────────────
+// ── 이메일 알림 (Resend + Supabase Edge Function) ──────
+// 📌 TODO: 다음 버전에서 구현
+// 1. Supabase Edge Function 배포 필요
+// 2. CORS 설정 완료 후 활성화
+// 3. 테스트: 브라우저 콘솔에서 오류 메시지 확인
 const RESEND_API_KEY = 're_AJsGmpvY_LopVUCx6X9TyVBhBRMjPxkqU';
 
 async function sendReservationEmail(emails, info) {
-  // Edge Function 배포 대기 중 - 일단 비활성화
+  // 현재 비활성화 - Edge Function 배포 대기 중
+  // 이전 구현: src/supabase-edge-function.ts 참고
   return;
+
+  // 구현 예정 코드:
+  /*
+  if (!Array.isArray(emails)) emails = [emails];
+  emails = emails.filter(e => e && e.includes('@'));
+  if (!emails.length) return;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-reservation-email`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ emails, info })
+    });
+
+    const resData = await res.json();
+    if (!res.ok) {
+      toast(`⚠️ 이메일 발송 실패: ${resData.error || '오류'}`, '❌');
+    } else {
+      toast(`✅ ${emails.length}명에게 예약 확인 메일 발송됨`, '📧');
+    }
+  } catch(e) {
+    console.error('이메일 발송 오류:', e);
+  }
+  */
 }
 
 // ── 기본 회의실 / 부서 ────────────────────────
