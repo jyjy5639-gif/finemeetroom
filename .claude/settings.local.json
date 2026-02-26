@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(git add app.js)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git add .gitignore app.js index.html netlify.toml)",
+      "Bash(git add .github/workflows/deploy.yml)"
     ]
   }
 }
