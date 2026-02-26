@@ -86,15 +86,13 @@ function makeRoomColors(hex) {
 }
 
 // ── Supabase ───────────────────────────────────
-const DEFAULT_SUPABASE_URL = 'https://exlebcpdszfjzoaejcou.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4bGViY3Bkc3pmanpvYWVqY291Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MjM2MjgsImV4cCI6MjA4NzM5OTYyOH0.ioIvWO7hZbF5Dw2YeQqAGpJqDipKsYCwqWiwlHWRkGo';
 let SUPABASE_URL = '', SUPABASE_KEY = '';
 const CFG_URL_KEY = 'meetroom_supabase_url', CFG_KEY_KEY = 'meetroom_supabase_key';
 
 function loadConfig() {
-  SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || DEFAULT_SUPABASE_URL;
-  SUPABASE_KEY = localStorage.getItem(CFG_KEY_KEY) || DEFAULT_SUPABASE_KEY;
-  return true;
+  SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || '';
+  SUPABASE_KEY = localStorage.getItem(CFG_KEY_KEY) || '';
+  return !!(SUPABASE_URL && SUPABASE_KEY);
 }
 
 async function saveConfig() {
