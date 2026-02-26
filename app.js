@@ -90,8 +90,9 @@ let SUPABASE_URL = '', SUPABASE_KEY = '';
 const CFG_URL_KEY = 'meetroom_supabase_url', CFG_KEY_KEY = 'meetroom_supabase_key';
 
 function loadConfig() {
-  SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || '';
-  SUPABASE_KEY = localStorage.getItem(CFG_KEY_KEY) || '';
+  const cfg = window.MEETROOM_CONFIG || {};
+  SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || cfg.supabaseUrl || '';
+  SUPABASE_KEY = localStorage.getItem(CFG_KEY_KEY) || cfg.supabaseKey || '';
   return !!(SUPABASE_URL && SUPABASE_KEY);
 }
 
