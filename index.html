@@ -13,38 +13,33 @@
 <div id="setupScreen">
   <div class="setup-box">
     <div class="setup-logo">MEETROOM / SETUP</div>
-    <div class="setup-title">Supabase 연결 설정</div>
+    <div class="setup-title">Firebase 연결 설정</div>
     <div class="setup-desc">처음 한 번만 설정하면 이후에는 자동으로 연결됩니다.<br>아래 순서대로 진행해주세요.</div>
     <div class="setup-step">
       <div class="step-num">1</div>
-      <div class="step-text"><a href="https://supabase.com" target="_blank">supabase.com</a> 에서 무료 계정 생성 후 새 프로젝트를 만드세요.</div>
+      <div class="step-text"><a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> 에서 새 프로젝트를 만드세요.</div>
     </div>
     <div class="setup-step">
       <div class="step-num">2</div>
-      <div class="step-text">프로젝트 생성 후 <strong>SQL Editor</strong> 메뉴에서 아래 SQL을 실행하세요.</div>
+      <div class="step-text"><strong>Firestore Database</strong> 메뉴에서 데이터베이스를 생성하고, 보안 규칙을 아래와 같이 설정하세요.</div>
     </div>
-    <div class="sql-block">CREATE TABLE reservations (
-  id         bigserial PRIMARY KEY,
-  room_idx   integer NOT NULL,
-  date       text NOT NULL,
-  start_time text NOT NULL,
-  end_time   text NOT NULL,
-  dept       text NOT NULL,
-  name       text NOT NULL,
-  purpose    text NOT NULL,
-  created_at timestamptz DEFAULT now()
-);
-ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON reservations FOR ALL USING (true) WITH CHECK (true);</div>
+    <div class="sql-block">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</div>
     <div class="setup-step">
       <div class="step-num">3</div>
-      <div class="step-text"><strong>Project Settings → API</strong> 에서 <code>Project URL</code>과 <code>anon public key</code>를 복사해서 아래에 붙여넣으세요.</div>
+      <div class="step-text"><strong>프로젝트 설정 (⚙) → 일반</strong> 탭에서 <code>웹 API 키</code>와 <code>프로젝트 ID</code>를 복사해서 아래에 붙여넣으세요.</div>
     </div>
     <hr class="setup-divider">
-    <label class="setup-input-label">Supabase Project URL</label>
-    <input class="setup-input" id="cfgUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
-    <label class="setup-input-label">Supabase Anon Key</label>
-    <input class="setup-input" id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off">
+    <label class="setup-input-label">Firebase Web API Key</label>
+    <input class="setup-input" id="cfgApiKey" placeholder="AIzaSy..." autocomplete="off">
+    <label class="setup-input-label">Firebase Project ID</label>
+    <input class="setup-input" id="cfgProjectId" placeholder="my-project-12345" autocomplete="off">
     <button class="setup-btn" id="setupBtn" onclick="saveConfig()">연결 확인 및 시작</button>
     <div class="setup-error" id="setupError"></div>
   </div>
@@ -103,7 +98,7 @@ CREATE POLICY "allow_all" ON reservations FOR ALL USING (true) WITH CHECK (true)
     <div class="view-bar">
       <div>
         <div class="view-title" id="viewTitle"></div>
-        <div class="view-sub">09:00–18:00 운영 · 30분 단위 · <span style="color:#2ab87a;font-weight:600;">Supabase 실시간 공유</span></div>
+        <div class="view-sub">09:00–18:00 운영 · 30분 단위 · <span style="color:#2ab87a;font-weight:600;">Firebase 실시간 공유</span></div>
       </div>
       <div class="view-controls">
         <button class="btn-reserve" onclick="openModal()">＋ 예약하기</button>
@@ -144,7 +139,7 @@ CREATE POLICY "allow_all" ON reservations FOR ALL USING (true) WITH CHECK (true)
           <span class="save-feedback" id="deptSaveFeedback">✅ 저장되었습니다</span>
         </div>
         <hr class="admin-divider">
-        <div class="admin-section-title">Supabase 연결 재설정</div>
+        <div class="admin-section-title">Firebase 연결 재설정</div>
         <div class="admin-section-sub" style="margin-bottom:12px">연결 정보를 초기화하고 다시 설정합니다.</div>
         <button class="btn-ghost" onclick="resetConfig()" style="color:#e8522a;border-color:#e8522a">연결 초기화</button>
       </div>
@@ -236,6 +231,8 @@ CREATE POLICY "allow_all" ON reservations FOR ALL USING (true) WITH CHECK (true)
   </button>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

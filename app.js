@@ -7,45 +7,12 @@ function authThen(fn) {
   else { toast('암호가 올바르지 않습니다', '🔒'); }
 }
 
-// ── 이메일 알림 (Resend + Supabase Edge Function) ──────
-// 📌 TODO: 다음 버전에서 구현
-// 1. Supabase Edge Function 배포 필요
-// 2. CORS 설정 완료 후 활성화
-// 3. 테스트: 브라우저 콘솔에서 오류 메시지 확인
-// ⚠️ API Key는 환경변수에서 로드 필요 (보안상 하드코딩 금지)
+// ── 이메일 알림 (미구현) ──────────────────────
 const RESEND_API_KEY = '';
 
 async function sendReservationEmail(emails, info) {
-  // 현재 비활성화 - Edge Function 배포 대기 중
-  // 이전 구현: src/supabase-edge-function.ts 참고
+  // TODO: Firebase Cloud Functions 또는 외부 API로 구현
   return;
-
-  // 구현 예정 코드:
-  /*
-  if (!Array.isArray(emails)) emails = [emails];
-  emails = emails.filter(e => e && e.includes('@'));
-  if (!emails.length) return;
-
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-reservation-email`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ emails, info })
-    });
-
-    const resData = await res.json();
-    if (!res.ok) {
-      toast(`⚠️ 이메일 발송 실패: ${resData.error || '오류'}`, '❌');
-    } else {
-      toast(`✅ ${emails.length}명에게 예약 확인 메일 발송됨`, '📧');
-    }
-  } catch(e) {
-    console.error('이메일 발송 오류:', e);
-  }
-  */
 }
 
 // ── 기본 회의실 / 부서 ────────────────────────
@@ -63,21 +30,16 @@ let DEPTS = [...DEFAULT_DEPTS];
 
 async function loadRoomsAndDepts() {
   try {
-    const rows = await sbFetch('settings?select=key,value');
-    if (!rows) return;
-    rows.forEach(row => {
-      if (row.key === 'rooms' && Array.isArray(row.value)) ROOMS = row.value;
-      if (row.key === 'depts' && Array.isArray(row.value)) DEPTS = row.value;
+    const snap = await db.collection('settings').get();
+    snap.docs.forEach(d => {
+      if (d.id === 'rooms' && Array.isArray(d.data().value)) ROOMS = d.data().value;
+      if (d.id === 'depts' && Array.isArray(d.data().value)) DEPTS = d.data().value;
     });
   } catch(e) { console.warn('설정 로드 실패, 기본값 사용:', e.message); }
 }
 
 async function saveSettingToDb(key, value) {
-  await sbFetch('settings', {
-    method: 'POST',
-    headers: { 'Prefer': 'resolution=merge-duplicates' },
-    body: JSON.stringify({ key, value, updated_at: new Date().toISOString() })
-  });
+  await db.collection('settings').doc(key).set({ value, updated_at: new Date().toISOString() });
 }
 
 function makeRoomColors(hex) {
@@ -85,34 +47,48 @@ function makeRoomColors(hex) {
   return { light:`rgba(${r},${g},${b},0.08)`, textColor:`rgb(${Math.round(r*.7)},${Math.round(g*.7)},${Math.round(b*.7)})` };
 }
 
-// ── Supabase ───────────────────────────────────
-let SUPABASE_URL = '', SUPABASE_KEY = '';
-const CFG_URL_KEY = 'meetroom_supabase_url', CFG_KEY_KEY = 'meetroom_supabase_key';
+// ── Firebase ───────────────────────────────────
+let db = null;
+const CFG_API_KEY = 'meetroom_firebase_apikey';
+const CFG_PROJ_ID = 'meetroom_firebase_projectid';
 
-function loadConfig() {
+function initFirebase() {
   const cfg = window.MEETROOM_CONFIG || {};
-  SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || cfg.supabaseUrl || '';
-  SUPABASE_KEY = localStorage.getItem(CFG_KEY_KEY) || cfg.supabaseKey || '';
-  return !!(SUPABASE_URL && SUPABASE_KEY);
+  const apiKey    = localStorage.getItem(CFG_API_KEY)  || cfg.firebaseApiKey    || '';
+  const projectId = localStorage.getItem(CFG_PROJ_ID)  || cfg.firebaseProjectId || '';
+  if (!apiKey || !projectId) return false;
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey,
+        projectId,
+        authDomain: `${projectId}.firebaseapp.com`,
+      });
+    }
+    db = firebase.firestore();
+    return true;
+  } catch(e) { console.error('Firebase init error:', e); return false; }
 }
 
 async function saveConfig() {
-  const url = document.getElementById('cfgUrl').value.trim().replace(/\/$/, '');
-  const key = document.getElementById('cfgKey').value.trim();
+  const apiKey    = document.getElementById('cfgApiKey').value.trim();
+  const projectId = document.getElementById('cfgProjectId').value.trim();
   const btn = document.getElementById('setupBtn');
-  if (!url || !key) { showSetupError('URL과 Key를 모두 입력해주세요.'); return; }
-  if (!url.startsWith('https://')) { showSetupError('URL은 https://로 시작해야 합니다.'); return; }
+  if (!apiKey || !projectId) { showSetupError('API Key와 Project ID를 모두 입력해주세요.'); return; }
   btn.disabled = true; btn.textContent = '연결 확인 중...';
+  localStorage.setItem(CFG_API_KEY, apiKey);
+  localStorage.setItem(CFG_PROJ_ID, projectId);
+  if (!initFirebase()) {
+    showSetupError('Firebase 초기화 실패');
+    btn.disabled = false; btn.textContent = '연결 확인 및 시작';
+    return;
+  }
   try {
-    const res = await fetch(`${url}/rest/v1/reservations?limit=1`, {
-      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
-    });
-    if (!res.ok) throw new Error(`응답 오류 (${res.status})`);
-    localStorage.setItem(CFG_URL_KEY, url); localStorage.setItem(CFG_KEY_KEY, key);
-    SUPABASE_URL = url; SUPABASE_KEY = key;
+    await db.collection('reservations').limit(1).get();
     startApp();
   } catch(e) {
-    showSetupError(e.message);
+    localStorage.removeItem(CFG_API_KEY); localStorage.removeItem(CFG_PROJ_ID);
+    showSetupError('연결 실패: ' + e.message);
     btn.disabled = false; btn.textContent = '연결 확인 및 시작';
   }
 }
@@ -123,8 +99,8 @@ function showSetupError(msg) {
 }
 
 function resetConfig() {
-  if (!confirm('Supabase 설정을 초기화하고 재설정 화면으로 돌아갑니다.')) return;
-  localStorage.removeItem(CFG_URL_KEY); localStorage.removeItem(CFG_KEY_KEY);
+  if (!confirm('Firebase 설정을 초기화하고 재설정 화면으로 돌아갑니다.')) return;
+  localStorage.removeItem(CFG_API_KEY); localStorage.removeItem(CFG_PROJ_ID);
   location.reload();
 }
 
@@ -137,23 +113,6 @@ async function startApp() {
   updateDeptSelectOptions();
   loadData();
   setInterval(loadData, 30000);
-}
-
-async function sbFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json', 'Prefer': options.prefer || '',
-      ...(options.headers || {})
-    }
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || '서버 오류');
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
 }
 
 // ── 상태 ───────────────────────────────────────
@@ -185,8 +144,8 @@ function setSyncState(state){
 async function loadData(){
   setSyncState('loading');
   try {
-    const data = await sbFetch('reservations?select=*&order=date,room_idx,start_time');
-    reservations = data || [];
+    const snap = await db.collection('reservations').get();
+    reservations = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     setSyncState('ok'); render();
   } catch(e) { setSyncState('error'); toast('데이터 로드 실패: '+e.message,'❌'); }
 }
@@ -269,7 +228,7 @@ function renderGrid(){
       const res=getResAt(ri,ds,slot);
       if(res){
         const r=ROOMS[ri];
-        tbody+=`<td><div class="slot-booked" style="background:${r.light};color:${r.textColor}" onclick="openDetailModal(${res.id})" title="${res.dept} · ${res.name}">
+        tbody+=`<td><div class="slot-booked" style="background:${r.light};color:${r.textColor}" onclick="openDetailModal('${res.id}')" title="${res.dept} · ${res.name}">
           <div class="sb-name">${res.name}</div><div class="sb-meta">${res.purpose}</div>
         </div></td>`;
       } else {
@@ -302,7 +261,7 @@ function renderList(){
         <td>${r.dept}</td><td>${r.name}</td>
         <td style="color:var(--text-mid)">${r.purpose}</td>
         <td style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace">${ca}</td>
-        <td><button class="btn-cancel" onclick="confirmCancel(${r.id})">취소</button></td>
+        <td><button class="btn-cancel" onclick="confirmCancel('${r.id}')">취소</button></td>
       </tr>`;
     });
   }
@@ -458,21 +417,17 @@ async function openEditModal(id) {
   isEditMode = true;
   editingResId = id;
 
-  // Pre-fill the booking modal with existing reservation data
   document.getElementById('fRoom').value = res.room_idx;
   document.getElementById('fDate').value = res.date;
   document.getElementById('fDept').value = res.dept;
   document.getElementById('fName').value = res.name;
   document.getElementById('fPurpose').value = res.purpose;
 
-  // Update modal title and button text
   document.querySelector('.modal-title').textContent = '예약 수정';
   document.getElementById('btnConfirm').textContent = '수정 확정';
 
-  // Trigger slot rebuilding
   onFormChange();
 
-  // Open booking modal and close detail modal
   closeDetailModal();
   document.getElementById('overlay').classList.add('open');
 }
@@ -497,14 +452,14 @@ async function cancelFromDetail(){
   if(!confirm('예약을 취소하시겠습니까?'))return;
   const idToDelete = detailResId;
   closeDetailModal(); setSyncState('loading');
-  try { await sbFetch(`reservations?id=eq.${idToDelete}`,{method:'DELETE'}); toast('예약이 취소되었습니다','🗑️'); await loadData(); }
+  try { await db.collection('reservations').doc(idToDelete).delete(); toast('예약이 취소되었습니다','🗑️'); await loadData(); }
   catch(e){ setSyncState('error'); toast('취소 실패: '+e.message,'❌'); }
 }
 
 async function confirmCancel(id){
   if(!confirm('예약을 취소하시겠습니까?'))return;
   setSyncState('loading');
-  try { await sbFetch(`reservations?id=eq.${id}`,{method:'DELETE'}); toast('예약이 취소되었습니다','🗑️'); await loadData(); }
+  try { await db.collection('reservations').doc(id).delete(); toast('예약이 취소되었습니다','🗑️'); await loadData(); }
   catch(e){ setSyncState('error'); toast('취소 실패: '+e.message,'❌'); }
 }
 
@@ -513,7 +468,6 @@ function openModalWith(ri,slot){prefillRoom=ri;prefillStart=slot;setupModal();do
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 
 function setupModal(){
-  // Reset edit mode when opening fresh booking form
   isEditMode = false;
   editingResId = null;
 
@@ -561,7 +515,6 @@ function buildEndSlots(){
   for(let add=30;add<=480;add+=30){
     const em=sm+add; if(em>18*60)break;
     const et=fromMin(em);
-    // Skip conflict check if editing existing reservation
     if(!isEditMode&&!isNaN(ri)&&date&&hasConflict(ri,date,start,et))break;
     opts.push(et);
   }
@@ -577,7 +530,6 @@ function checkConflict(){
   const date=document.getElementById('fDate').value;
   const start=document.getElementById('fStart').value;
   const end=document.getElementById('fEnd').value;
-  // Don't show conflict warning if editing (user can keep same time)
   const conflict=isEditMode?false:(!isNaN(ri)&&date&&start&&end&&hasConflict(ri,date,start,end));
   document.getElementById('conflictWarn').classList.toggle('show',conflict);
   document.getElementById('btnConfirm').disabled=conflict;
@@ -600,7 +552,6 @@ async function submitForm(){
   const name=document.getElementById('fName').value.trim();
   const purpose=document.getElementById('fPurpose').value.trim();
 
-  // 이메일 여러 개 수집 (UPDATE 중에는 스킵됨)
   const emailInputs = document.querySelectorAll('.email-input');
   const emails = Array.from(emailInputs).map(input => input.value.trim()).filter(e => e.includes('@'));
 
@@ -615,22 +566,11 @@ async function submitForm(){
     const payload = {room_idx:ri,date,start_time:start,end_time:end,dept,name,purpose};
 
     if(isEditMode) {
-      // UPDATE existing reservation
-      await sbFetch(`reservations?id=eq.${editingResId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload)
-      });
+      await db.collection('reservations').doc(editingResId).update(payload);
       toast(`예약이 수정되었습니다!`, '✏️');
     } else {
-      // CREATE new reservation
-      await sbFetch('reservations', {
-        method: 'POST',
-        prefer: 'return=minimal',
-        body: JSON.stringify(payload)
-      });
+      await db.collection('reservations').add({ ...payload, created_at: new Date().toISOString() });
       toast(`${ROOMS[ri].name} ${start}~${end} 예약 완료!`, '✅');
-
-      // 이메일 알림 (백그라운드) - 새 예약만 발송
       if(emails.length>0){
         sendReservationEmail(emails,{room:ROOMS[ri].name,date,start,end,dept,name,purpose});
       }
@@ -641,7 +581,6 @@ async function submitForm(){
     selDate=new Date(y,mo-1,d);
     await loadData();
 
-    // Reset edit mode
     isEditMode = false;
     editingResId = null;
   } catch(e){
@@ -662,4 +601,4 @@ function toast(msg,icon='✅'){
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 document.getElementById('detailOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('detailOverlay'))closeDetailModal();});
 
-if(loadConfig()){ startApp(); } else { document.getElementById('setupScreen').style.display='flex'; }
+if(initFirebase()){ startApp(); } else { document.getElementById('setupScreen').style.display='flex'; }
