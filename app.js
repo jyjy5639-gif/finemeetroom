@@ -47,6 +47,7 @@ const DEFAULT_DEPTS = ['투자본부','경영지원본부','투자1부','투자2
 
 let ROOMS = [...DEFAULT_ROOMS];
 let DEPTS = [...DEFAULT_DEPTS];
+let USERS = []; // {name, email}
 
 async function loadRoomsAndDepts() {
   try {
@@ -54,6 +55,7 @@ async function loadRoomsAndDepts() {
     snap.docs.forEach(d => {
       if (d.id === 'rooms' && Array.isArray(d.data().value)) ROOMS = d.data().value;
       if (d.id === 'depts' && Array.isArray(d.data().value)) DEPTS = d.data().value;
+      if (d.id === 'users' && Array.isArray(d.data().value)) USERS = d.data().value;
     });
   } catch(e) { console.warn('설정 로드 실패, 기본값 사용:', e.message); }
 }
@@ -309,7 +311,7 @@ function switchPage(p){
   if(p==='admin') renderAdmin(); else render();
 }
 
-function renderAdmin(){ renderRoomEditor(); renderDeptEditor(); }
+function renderAdmin(){ renderRoomEditor(); renderDeptEditor(); renderUserEditor(); }
 
 function renderRoomEditor(){
   const allFeatures = ['모니터 연결 가능', '화이트보드'];
@@ -412,6 +414,45 @@ async function saveDepts(){
   } catch(e){ toast('저장 실패: '+e.message,'❌'); }
 }
 
+// ── 사용자 관리 ────────────────────────────────
+function renderUserEditor(){
+  let html='';
+  USERS.forEach((u,i)=>{
+    html+=`<div class="dept-editor-card" id="ucard-${i}" style="display:flex;gap:8px;align-items:center;">
+      <input type="text" value="${u.name}" id="uname-${i}" placeholder="이름" style="flex:1">
+      <input type="email" value="${u.email}" id="uemail-${i}" placeholder="이메일" style="flex:2">
+      <button class="btn-del-room" onclick="deleteUser(${i})" title="삭제">×</button>
+    </div>`;
+  });
+  const el = document.getElementById('userEditorList');
+  if(el) el.innerHTML = html || '<div style="font-size:12px;color:var(--text-dim);padding:8px 0;">등록된 사용자가 없습니다.</div>';
+}
+
+function addUserEditor(){
+  USERS.push({name:'',email:''}); renderUserEditor();
+  setTimeout(()=>{ const els=document.querySelectorAll('[id^="uname-"]'); if(els.length) els[els.length-1].focus(); },50);
+}
+
+function deleteUser(i){
+  USERS.splice(i,1); renderUserEditor();
+}
+
+async function saveUsers(){
+  const newUsers=[];
+  USERS.forEach((_,i)=>{
+    const name=document.getElementById(`uname-${i}`)?.value.trim();
+    const email=document.getElementById(`uemail-${i}`)?.value.trim();
+    if(name&&email) newUsers.push({name,email});
+  });
+  USERS=newUsers;
+  try {
+    await saveSettingToDb('users',USERS);
+    const fb=document.getElementById('userSaveFeedback');
+    fb.classList.add('show'); setTimeout(()=>fb.classList.remove('show'),2500);
+    toast('✅ 사용자 목록이 저장되었습니다');
+  } catch(e){ toast('저장 실패: '+e.message,'❌'); }
+}
+
 function updateRoomSelectOptions(){
   const sel=document.getElementById('fRoom'), cur=sel.value;
   sel.innerHTML='<option value="">선택</option>'+ROOMS.map((r,i)=>`<option value="${i}">${r.name} (${r.cap}인)</option>`).join('');
@@ -487,6 +528,39 @@ function openModal(){prefillRoom=null;prefillStart=null;setupModal();document.ge
 function openModalWith(ri,slot){prefillRoom=ri;prefillStart=slot;setupModal();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 
+function collectEmailsFromModal(){
+  return Array.from(document.querySelectorAll('.email-row')).map(row => {
+    const sel = row.querySelector('.email-select');
+    const input = row.querySelector('.email-input');
+    if(sel.value === 'manual') return input.value.trim();
+    if(sel.value.startsWith('user:')) {
+      const idx = parseInt(sel.value.split(':')[1]);
+      return USERS[idx]?.email || '';
+    }
+    return '';
+  }).filter(e => e.includes('@'));
+}
+
+async function sendEmailFromModal(){
+  const ri=parseInt(document.getElementById('fRoom').value);
+  const date=document.getElementById('fDate').value;
+  const start=document.getElementById('fStart').value;
+  const end=document.getElementById('fEnd').value;
+  const dept=document.getElementById('fDept').value;
+  const name=document.getElementById('fName').value.trim();
+  const purpose=document.getElementById('fPurpose').value.trim();
+  const emails = collectEmailsFromModal();
+
+  if(emails.length === 0){ toast('이메일 수신자를 선택하거나 입력해주세요','⚠️'); return; }
+  if(!name||!date||isNaN(ri)){ toast('예약 정보를 먼저 입력해주세요','⚠️'); return; }
+
+  const btn = document.getElementById('btnSendEmail');
+  btn.disabled = true; btn.textContent = '전송 중...';
+  await sendReservationEmail(emails, {room:ROOMS[ri]?.name||'',date,start,end,dept,name,purpose});
+  toast(`이메일을 ${emails.length}명에게 전송했습니다`, '📧');
+  btn.disabled = false; btn.textContent = '이메일 보내기';
+}
+
 function setupModal(){
   isEditMode = false;
   editingResId = null;
@@ -499,24 +573,60 @@ function setupModal(){
   document.getElementById('fDept').value='';
   document.getElementById('fName').value='';
   document.getElementById('fPurpose').value='';
-  document.getElementById('emailContainer').innerHTML='<input type="email" class="email-input" placeholder="example@company.com" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:\'Pretendard\',sans-serif;font-size:13px;outline:none;transition:border-color .15s;width:100%;" />';
+  document.getElementById('emailContainer').innerHTML='';
+  addEmailInput();
   document.getElementById('conflictWarn').classList.remove('show');
   document.getElementById('btnConfirm').disabled=false;
   buildStartSlots(); updatePill();
 }
 
+function buildUserSelectOptions(){
+  let opts = '<option value="">-- 선택 또는 직접 입력 --</option>';
+  USERS.forEach((u,i) => {
+    opts += `<option value="user:${i}">${u.name} (${u.email})</option>`;
+  });
+  opts += '<option value="manual">직접 입력</option>';
+  return opts;
+}
+
 function addEmailInput(){
   const container = document.getElementById('emailContainer');
   if (!container) return;
-  const count = container.querySelectorAll('.email-input').length;
+  const count = container.querySelectorAll('.email-row').length;
   if (count >= 5) { toast('최대 5개까지만 추가 가능합니다', '⚠️'); return; }
-  const input = document.createElement('input');
-  input.type = 'email';
-  input.className = 'email-input';
-  input.placeholder = `example${count + 1}@company.com`;
-  input.style.cssText = 'padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:\'Pretendard\',sans-serif;font-size:13px;outline:none;transition:border-color .15s;width:100%;';
-  container.appendChild(input);
-  input.focus();
+  const row = document.createElement('div');
+  row.className = 'email-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  row.innerHTML = `
+    <select class="email-select" onchange="onEmailSelectChange(this)" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;">
+      ${buildUserSelectOptions()}
+    </select>
+    <input type="email" class="email-input" placeholder="이메일 직접 입력" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;display:none;">
+    <button type="button" onclick="removeEmailRow(this)" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-mid);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function onEmailSelectChange(sel){
+  const row = sel.closest('.email-row');
+  const input = row.querySelector('.email-input');
+  if(sel.value === 'manual'){
+    input.style.display = '';
+    input.focus();
+  } else if(sel.value.startsWith('user:')){
+    const idx = parseInt(sel.value.split(':')[1]);
+    input.style.display = 'none';
+    input.value = USERS[idx]?.email || '';
+  } else {
+    input.style.display = 'none';
+    input.value = '';
+  }
+}
+
+function removeEmailRow(btn){
+  const container = document.getElementById('emailContainer');
+  if(container.querySelectorAll('.email-row').length <= 1) return;
+  btn.closest('.email-row').remove();
 }
 
 function buildStartSlots(){
@@ -572,9 +682,6 @@ async function submitForm(){
   const name=document.getElementById('fName').value.trim();
   const purpose=document.getElementById('fPurpose').value.trim();
 
-  const emailInputs = document.querySelectorAll('.email-input');
-  const emails = Array.from(emailInputs).map(input => input.value.trim()).filter(e => e.includes('@'));
-
   if(isNaN(ri)||!date||!start||!end||!dept||!name||!purpose){toast('모든 항목을 입력해주세요','⚠️');return;}
 
   document.getElementById('btnConfirm').disabled=true;
@@ -591,9 +698,6 @@ async function submitForm(){
     } else {
       await db.collection('reservations').add({ ...payload, created_at: new Date().toISOString() });
       toast(`${ROOMS[ri].name} ${start}~${end} 예약 완료!`, '✅');
-      if(emails.length>0){
-        sendReservationEmail(emails,{room:ROOMS[ri].name,date,start,end,dept,name,purpose});
-      }
     }
 
     closeModal();

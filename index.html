@@ -139,6 +139,15 @@ service cloud.firestore {
           <span class="save-feedback" id="deptSaveFeedback">✅ 저장되었습니다</span>
         </div>
         <hr class="admin-divider">
+        <div class="admin-section-title">사용자 관리</div>
+        <div class="admin-section-sub">예약 시 이메일 수신자로 빠르게 선택할 수 있는 사용자 목록입니다.</div>
+        <div class="dept-editor-list" id="userEditorList"></div>
+        <button class="btn-add-room" onclick="addUserEditor()" style="margin-bottom:0">＋ 사용자 추가</button>
+        <div class="admin-save-bar">
+          <button class="btn-save-rooms" onclick="saveUsers()">사용자 저장</button>
+          <span class="save-feedback" id="userSaveFeedback">✅ 저장되었습니다</span>
+        </div>
+        <hr class="admin-divider">
         <div class="admin-section-title">Firebase 연결 재설정</div>
         <div class="admin-section-sub" style="margin-bottom:12px">연결 정보를 초기화하고 다시 설정합니다.</div>
         <button class="btn-ghost" onclick="resetConfig()" style="color:#e8522a;border-color:#e8522a">연결 초기화</button>
@@ -181,10 +190,11 @@ service cloud.firestore {
     <div class="form-full">
       <div style="margin-bottom:5px"><label>이메일 <span style="color:var(--text-dim);font-size:10px;text-transform:none;font-weight:400;">(예약 확인 메일 수신 · 선택)</span></label></div>
       <div id="emailContainer" style="display:flex;flex-direction:column;gap:8px;"></div>
-      <button type="button" class="btn-add-room" onclick="addEmailInput()" style="margin-top:8px">＋ 이메일 추가</button>
+      <button type="button" class="btn-add-room" onclick="addEmailInput()" style="margin-top:8px">＋ 수신자 추가</button>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">취소</button>
+      <button class="btn-ghost" id="btnSendEmail" onclick="sendEmailFromModal()" style="color:#2a7ae8;border-color:#2a7ae8">이메일 보내기</button>
       <button class="btn-confirm" id="btnConfirm" onclick="submitForm()">예약 확정</button>
     </div>
   </div>
