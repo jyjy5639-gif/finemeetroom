@@ -18,18 +18,16 @@ async function sendReservationEmail(emails, info) {
   if (!emails || emails.length === 0) return;
   try {
     emailjs.init(EMAILJS_PUBLIC_KEY);
-    for (const email of emails) {
-      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-        to_email:   email,
-        name:       info.name,
-        room_name:  info.room,
-        date:       info.date,
-        start_time: info.start,
-        end_time:   info.end,
-        dept:       info.dept,
-        purpose:    info.purpose,
-      });
-    }
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email:   emails.join(', '),
+      name:       info.name,
+      room_name:  info.room,
+      date:       info.date,
+      start_time: info.start,
+      end_time:   info.end,
+      dept:       info.dept,
+      purpose:    info.purpose,
+    });
   } catch(e) {
     console.warn('이메일 전송 실패:', e);
   }
