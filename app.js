@@ -494,6 +494,29 @@ async function openEditModal(id) {
   document.getElementById('fEnd').value = res.end_time;
   updatePill();
 
+  // 이메일 수신자 복원
+  document.getElementById('emailContainer').innerHTML = '';
+  const savedEmails = res.emails && res.emails.length > 0 ? res.emails : [];
+  if(savedEmails.length > 0){
+    savedEmails.forEach(email => {
+      buildDetailEmailRow('emailContainer');
+      const rows = document.querySelectorAll('#emailContainer .email-row');
+      const lastRow = rows[rows.length - 1];
+      const sel = lastRow.querySelector('.email-select');
+      const matchIdx = USERS.findIndex(u => u.email === email);
+      if(matchIdx >= 0){
+        sel.value = `user:${matchIdx}`;
+      } else {
+        sel.value = 'manual';
+        const input = lastRow.querySelector('.email-input');
+        input.style.display = '';
+        input.value = email;
+      }
+    });
+  } else {
+    buildDetailEmailRow('emailContainer');
+  }
+
   closeDetailModal();
   document.getElementById('overlay').classList.add('open');
 }
@@ -511,7 +534,26 @@ function openDetailModal(id){
   document.getElementById('detailName').textContent=res.name;
   document.getElementById('detailPurpose').textContent=res.purpose;
   document.getElementById('detailEmailContainer').innerHTML = '';
-  buildDetailEmailRow('detailEmailContainer');
+  const savedEmails = res.emails && res.emails.length > 0 ? res.emails : [];
+  if(savedEmails.length > 0){
+    savedEmails.forEach(email => {
+      buildDetailEmailRow('detailEmailContainer');
+      const rows = document.querySelectorAll('#detailEmailContainer .email-row');
+      const lastRow = rows[rows.length - 1];
+      const sel = lastRow.querySelector('.email-select');
+      const matchIdx = USERS.findIndex(u => u.email === email);
+      if(matchIdx >= 0){
+        sel.value = `user:${matchIdx}`;
+      } else {
+        sel.value = 'manual';
+        const input = lastRow.querySelector('.email-input');
+        input.style.display = '';
+        input.value = email;
+      }
+    });
+  } else {
+    buildDetailEmailRow('detailEmailContainer');
+  }
   document.getElementById('detailOverlay').classList.add('open');
 }
 function closeDetailModal(){ document.getElementById('detailOverlay').classList.remove('open'); detailResId=null; }
@@ -698,7 +740,8 @@ async function submitForm(){
   setSyncState('loading');
 
   try {
-    const payload = {room_idx:ri,date,start_time:start,end_time:end,dept,name,purpose};
+    const emails = collectEmailsFrom('emailContainer');
+  const payload = {room_idx:ri,date,start_time:start,end_time:end,dept,name,purpose,emails};
 
     if(isEditMode) {
       await db.collection('reservations').doc(editingResId).update(payload);
