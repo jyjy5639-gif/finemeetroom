@@ -7,12 +7,32 @@ function authThen(fn) {
   else { toast('암호가 올바르지 않습니다', '🔒'); }
 }
 
-// ── 이메일 알림 (미구현) ──────────────────────
-const RESEND_API_KEY = '';
+// ── 이메일 알림 (EmailJS) ──────────────────────
+// EmailJS 설정: https://emailjs.com 에서 발급
+const EMAILJS_SERVICE_ID  = 'finepartners0114';   // 예: 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'template_p9a1wdd';   // 예: 'template_xyz456'
+const EMAILJS_PUBLIC_KEY  = 'GMOOURMEXUo4WBLxL';   // Account > Public Key
 
 async function sendReservationEmail(emails, info) {
-  // TODO: Firebase Cloud Functions 또는 외부 API로 구현
-  return;
+  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return;
+  if (!emails || emails.length === 0) return;
+  try {
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    for (const email of emails) {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+        to_email:   email,
+        name:       info.name,
+        room_name:  info.room,
+        date:       info.date,
+        start_time: info.start,
+        end_time:   info.end,
+        dept:       info.dept,
+        purpose:    info.purpose,
+      });
+    }
+  } catch(e) {
+    console.warn('이메일 전송 실패:', e);
+  }
 }
 
 // ── 기본 회의실 / 부서 ────────────────────────
