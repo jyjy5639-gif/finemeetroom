@@ -194,7 +194,6 @@ service cloud.firestore {
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">취소</button>
-      <button class="btn-ghost" id="btnSendEmail" onclick="sendEmailFromModal()" style="color:#2a7ae8;border-color:#2a7ae8">이메일 보내기</button>
       <button class="btn-confirm" id="btnConfirm" onclick="submitForm()">예약 확정</button>
     </div>
   </div>
@@ -215,8 +214,14 @@ service cloud.firestore {
       <div class="detail-label">예약자</div><div class="detail-val" id="detailName"></div>
       <div class="detail-label">목적</div><div class="detail-val" id="detailPurpose"></div>
     </div>
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">이메일 수신자</div>
+      <div id="detailEmailContainer" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <button type="button" class="btn-add-room" onclick="addDetailEmailInput()" style="margin-top:8px">＋ 수신자 추가</button>
+    </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeDetailModal()">닫기</button>
+      <button class="btn-ghost" id="btnSendEmail" onclick="sendEmailFromDetail()" style="color:#2a7ae8;border-color:#2a7ae8">이메일 보내기</button>
       <button class="btn-ghost" id="btnEditRes" onclick="openEditModal(detailResId)" style="color:#2a7ae8;border-color:#2a7ae8">예약 수정</button>
       <button class="btn-cancel-confirm" id="btnCancelRes" onclick="cancelFromDetail()">예약 취소</button>
     </div>

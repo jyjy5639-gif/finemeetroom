@@ -487,7 +487,12 @@ async function openEditModal(id) {
   document.querySelector('.modal-title').textContent = '예약 수정';
   document.getElementById('btnConfirm').textContent = '수정 확정';
 
-  onFormChange();
+  // 시작 슬롯 빌드 후 기존 시간 복원
+  buildStartSlots();
+  document.getElementById('fStart').value = res.start_time;
+  buildEndSlots();
+  document.getElementById('fEnd').value = res.end_time;
+  updatePill();
 
   closeDetailModal();
   document.getElementById('overlay').classList.add('open');
@@ -505,6 +510,8 @@ function openDetailModal(id){
   document.getElementById('detailDept').textContent=res.dept;
   document.getElementById('detailName').textContent=res.name;
   document.getElementById('detailPurpose').textContent=res.purpose;
+  document.getElementById('detailEmailContainer').innerHTML = '';
+  buildDetailEmailRow('detailEmailContainer');
   document.getElementById('detailOverlay').classList.add('open');
 }
 function closeDetailModal(){ document.getElementById('detailOverlay').classList.remove('open'); detailResId=null; }
@@ -528,8 +535,28 @@ function openModal(){prefillRoom=null;prefillStart=null;setupModal();document.ge
 function openModalWith(ri,slot){prefillRoom=ri;prefillStart=slot;setupModal();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 
-function collectEmailsFromModal(){
-  return Array.from(document.querySelectorAll('.email-row')).map(row => {
+function buildDetailEmailRow(containerId){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const count = container.querySelectorAll('.email-row').length;
+  if(count >= 5){ toast('최대 5개까지만 추가 가능합니다','⚠️'); return; }
+  const row = document.createElement('div');
+  row.className = 'email-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  row.innerHTML = `
+    <select class="email-select" onchange="onEmailSelectChange(this)" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;">
+      ${buildUserSelectOptions()}
+    </select>
+    <input type="email" class="email-input" placeholder="이메일 직접 입력" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;display:none;">
+    <button type="button" onclick="this.closest('.email-row').remove()" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-mid);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function addDetailEmailInput(){ buildDetailEmailRow('detailEmailContainer'); }
+
+function collectEmailsFrom(containerId){
+  return Array.from(document.querySelectorAll(`#${containerId} .email-row`)).map(row => {
     const sel = row.querySelector('.email-select');
     const input = row.querySelector('.email-input');
     if(sel.value === 'manual') return input.value.trim();
@@ -541,22 +568,24 @@ function collectEmailsFromModal(){
   }).filter(e => e.includes('@'));
 }
 
-async function sendEmailFromModal(){
-  const ri=parseInt(document.getElementById('fRoom').value);
-  const date=document.getElementById('fDate').value;
-  const start=document.getElementById('fStart').value;
-  const end=document.getElementById('fEnd').value;
-  const dept=document.getElementById('fDept').value;
-  const name=document.getElementById('fName').value.trim();
-  const purpose=document.getElementById('fPurpose').value.trim();
-  const emails = collectEmailsFromModal();
-
+async function sendEmailFromDetail(){
+  if(!detailResId) return;
+  const res = reservations.find(r => r.id === detailResId);
+  if(!res){ toast('예약 정보를 찾을 수 없습니다','❌'); return; }
+  const emails = collectEmailsFrom('detailEmailContainer');
   if(emails.length === 0){ toast('이메일 수신자를 선택하거나 입력해주세요','⚠️'); return; }
-  if(!name||!date||isNaN(ri)){ toast('예약 정보를 먼저 입력해주세요','⚠️'); return; }
 
   const btn = document.getElementById('btnSendEmail');
   btn.disabled = true; btn.textContent = '전송 중...';
-  await sendReservationEmail(emails, {room:ROOMS[ri]?.name||'',date,start,end,dept,name,purpose});
+  await sendReservationEmail(emails, {
+    room: ROOMS[res.room_idx]?.name || '',
+    date: res.date,
+    start: res.start_time,
+    end: res.end_time,
+    dept: res.dept,
+    name: res.name,
+    purpose: res.purpose,
+  });
   toast(`이메일을 ${emails.length}명에게 전송했습니다`, '📧');
   btn.disabled = false; btn.textContent = '이메일 보내기';
 }
@@ -589,23 +618,7 @@ function buildUserSelectOptions(){
   return opts;
 }
 
-function addEmailInput(){
-  const container = document.getElementById('emailContainer');
-  if (!container) return;
-  const count = container.querySelectorAll('.email-row').length;
-  if (count >= 5) { toast('최대 5개까지만 추가 가능합니다', '⚠️'); return; }
-  const row = document.createElement('div');
-  row.className = 'email-row';
-  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
-  row.innerHTML = `
-    <select class="email-select" onchange="onEmailSelectChange(this)" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;">
-      ${buildUserSelectOptions()}
-    </select>
-    <input type="email" class="email-input" placeholder="이메일 직접 입력" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none;display:none;">
-    <button type="button" onclick="removeEmailRow(this)" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-mid);cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
-  `;
-  container.appendChild(row);
-}
+function addEmailInput(){ buildDetailEmailRow('emailContainer'); }
 
 function onEmailSelectChange(sel){
   const row = sel.closest('.email-row');
@@ -623,11 +636,6 @@ function onEmailSelectChange(sel){
   }
 }
 
-function removeEmailRow(btn){
-  const container = document.getElementById('emailContainer');
-  if(container.querySelectorAll('.email-row').length <= 1) return;
-  btn.closest('.email-row').remove();
-}
 
 function buildStartSlots(){
   const all=getSlots(), sel=document.getElementById('fStart');
