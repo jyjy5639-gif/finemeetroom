@@ -213,6 +213,9 @@ textarea { resize:vertical; min-height:68px; }
 .btn-add-room:hover { border-color:var(--text); color:var(--text); background:var(--bg); }
 .btn-del-room { background:none; border:1px solid var(--border); color:var(--text-dim); width:30px; height:30px; border-radius:7px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; transition:all .13s; flex-shrink:0; }
 .btn-del-room:hover { border-color:#e8522a; color:#e8522a; background:#fdf0ec; }
+.btn-order { background:none; border:1px solid var(--border); color:var(--text-dim); width:26px; height:30px; border-radius:7px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; transition:all .13s; flex-shrink:0; }
+.btn-order:hover:not(:disabled) { border-color:var(--text); color:var(--text); background:var(--bg); }
+.btn-order:disabled { opacity:0.3; cursor:default; }
 .btn-save-rooms { background:var(--text); color:#f5f4f0; border:none; padding:11px 24px; border-radius:9px; font-family:'Pretendard',sans-serif; font-size:14px; font-weight:600; cursor:pointer; transition:all .15s; }
 .btn-save-rooms:hover { background:#333; }
 .btn-save-rooms:disabled { background:var(--border); cursor:not-allowed; }

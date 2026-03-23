@@ -382,6 +382,8 @@ function renderDeptEditor(){
   DEPTS.forEach((d,i)=>{
     html+=`<div class="dept-row">
       <input type="text" value="${d}" id="dept-${i}" placeholder="부서명">
+      <button class="btn-order" onclick="moveDept(${i},-1)" title="위로" ${i===0?'disabled':''}>▲</button>
+      <button class="btn-order" onclick="moveDept(${i},1)" title="아래로" ${i===DEPTS.length-1?'disabled':''}>▼</button>
       <button class="btn-del-room" onclick="deleteDept(${i})" title="삭제">×</button>
     </div>`;
   });
@@ -393,8 +395,21 @@ function addDeptEditor(){
   setTimeout(()=>{ const els=document.querySelectorAll('[id^="dept-"]'); if(els.length) els[els.length-1].focus(); },50);
 }
 
+function syncDeptsFromDom(){
+  DEPTS = Array.from(document.querySelectorAll('[id^="dept-"]')).map(el=>el.value);
+}
+
+function moveDept(i, dir){
+  syncDeptsFromDom();
+  const j = i + dir;
+  if(j < 0 || j >= DEPTS.length) return;
+  [DEPTS[i], DEPTS[j]] = [DEPTS[j], DEPTS[i]];
+  renderDeptEditor();
+}
+
 function deleteDept(i){
   if(DEPTS.length<=1){toast('부서는 최소 1개 이상 필요합니다','⚠️');return;}
+  syncDeptsFromDom();
   DEPTS.splice(i,1); renderDeptEditor();
 }
 
@@ -419,6 +434,8 @@ function renderUserEditor(){
     html+=`<div class="dept-editor-card" id="ucard-${i}" style="display:flex;gap:8px;align-items:center;">
       <input type="text" value="${u.name}" id="uname-${i}" placeholder="이름" style="flex:1">
       <input type="email" value="${u.email}" id="uemail-${i}" placeholder="이메일" style="flex:2">
+      <button class="btn-order" onclick="moveUser(${i},-1)" title="위로" ${i===0?'disabled':''}>▲</button>
+      <button class="btn-order" onclick="moveUser(${i},1)" title="아래로" ${i===USERS.length-1?'disabled':''}>▼</button>
       <button class="btn-del-room" onclick="deleteUser(${i})" title="삭제">×</button>
     </div>`;
   });
@@ -431,7 +448,23 @@ function addUserEditor(){
   setTimeout(()=>{ const els=document.querySelectorAll('[id^="uname-"]'); if(els.length) els[els.length-1].focus(); },50);
 }
 
+function syncUsersFromDom(){
+  USERS = Array.from({length: document.querySelectorAll('[id^="uname-"]').length}, (_,i) => ({
+    name:  document.getElementById(`uname-${i}`)?.value || '',
+    email: document.getElementById(`uemail-${i}`)?.value || '',
+  }));
+}
+
+function moveUser(i, dir){
+  syncUsersFromDom();
+  const j = i + dir;
+  if(j < 0 || j >= USERS.length) return;
+  [USERS[i], USERS[j]] = [USERS[j], USERS[i]];
+  renderUserEditor();
+}
+
 function deleteUser(i){
+  syncUsersFromDom();
   USERS.splice(i,1); renderUserEditor();
 }
 
